@@ -26,7 +26,7 @@ export class Fighter {
 
         // Input buffer for combos
         this.inputBuffer = [];
-        this.inputBufferWindow = 10; // frames
+        this.inputBufferWindow = 12; // frames
 
         // Width/height for collision
         this.width = 24;
@@ -44,7 +44,9 @@ export class Fighter {
     get currentHeight() {
         return (this.state === FighterState.CROUCH ||
                 this.state === FighterState.BLOCK_CROUCH ||
-                this.state === FighterState.CROUCH_LIGHT)
+                this.state === FighterState.CROUCH_LIGHT ||
+                this.state === FighterState.CROUCH_HEAVY ||
+                this.state === FighterState.SWEEP)
             ? this.crouchHeight : this.height;
     }
 
@@ -74,19 +76,30 @@ export class Fighter {
     getHitbox() {
         if (!this.isAttacking || !this.isInActiveFrames || this.hitThisAttack) return null;
         const move = this.currentMoveData;
-        const hbX = this.x + (this.facing * 10);
-        const hbY = this.y - this.currentHeight * 0.6;
+        if (!move) return null;
+
+        const hbHeight = move.hbHeight || 20;
+        const hbOffsetY = move.hbOffsetY || -0.5;
+
+        // Calculate hitbox position relative to fighter
+        const hbX = this.x + (this.facing * 8);
+        const hbY = this.y - this.currentHeight * Math.abs(hbOffsetY) - hbHeight / 2;
+
         return {
             x: this.facing === 1 ? hbX : hbX - move.range,
             y: hbY,
             width: move.range,
-            height: 16,
+            height: hbHeight,
             move: this.currentMoveName,
             damage: move.damage,
             hitstun: move.hitstun,
             blockstun: move.blockstun,
             knockback: move.knockback,
             type: move.type || 'normal',
+            low: !!move.low,
+            overhead: !!move.overhead,
+            launcher: !!move.launcher,
+            knockdown: !!move.knockdown,
         };
     }
 
@@ -121,7 +134,7 @@ export class Fighter {
 
     bufferInput(action, frame) {
         this.inputBuffer.push({ action, frame });
-        if (this.inputBuffer.length > 12) {
+        if (this.inputBuffer.length > 16) {
             this.inputBuffer.shift();
         }
     }
@@ -147,7 +160,8 @@ export class Fighter {
         if (isBlocked) {
             this.hp -= Math.floor(amount * 0.15); // chip damage
             this.blockFlash = 6;
-            this.state = this.state === FighterState.CROUCH || this.state === FighterState.BLOCK_CROUCH
+            this.state = this.state === FighterState.CROUCH || this.state === FighterState.BLOCK_CROUCH ||
+                         this.state === FighterState.CROUCH_LIGHT || this.state === FighterState.CROUCH_HEAVY
                 ? FighterState.BLOCK_CROUCH : FighterState.BLOCK_STAND;
             this.stateFrame = 0;
             this.vx = -this.facing * knockback * 0.5;
@@ -198,7 +212,7 @@ export class Fighter {
                 this.y = this.groundY;
                 this.vy = 0;
                 this.isGrounded = true;
-                if (this.state === FighterState.JUMP || this.state === FighterState.JUMP_ATTACK) {
+                if (this.state === FighterState.JUMP || this.state === FighterState.JUMP_ATTACK || this.state === FighterState.JUMP_HEAVY) {
                     this.state = FighterState.IDLE;
                     this.stateFrame = 0;
                 }
@@ -252,7 +266,12 @@ export class Fighter {
             case FighterState.HEAVY_ATTACK:
             case FighterState.SPECIAL:
             case FighterState.CROUCH_LIGHT:
+            case FighterState.CROUCH_HEAVY:
             case FighterState.JUMP_ATTACK:
+            case FighterState.JUMP_HEAVY:
+            case FighterState.UPPERCUT:
+            case FighterState.OVERHEAD:
+            case FighterState.SWEEP:
                 this._handleAttackState(input, frameCount);
                 break;
 
@@ -295,11 +314,9 @@ export class Fighter {
                 break;
 
             case FighterState.KO:
-                // Stay in KO
                 break;
 
             case FighterState.WIN:
-                // Stay in WIN
                 break;
 
             case FighterState.INTRO:
@@ -353,18 +370,35 @@ export class Fighter {
     }
 
     _handleAttackInput(input, frameCount) {
+        // Special move (highest priority)
         if (input.specialPressed) {
             this.state = FighterState.SPECIAL;
             this.stateFrame = 0;
             this.hitThisAttack = false;
             return;
         }
+        // Uppercut: down + heavy
+        if (input.heavyPressed && input.down) {
+            this.state = FighterState.UPPERCUT;
+            this.stateFrame = 0;
+            this.hitThisAttack = false;
+            return;
+        }
+        // Overhead: forward + heavy (holding toward opponent)
+        if (input.heavyPressed && ((this.facing === 1 && input.right) || (this.facing === -1 && input.left))) {
+            this.state = FighterState.OVERHEAD;
+            this.stateFrame = 0;
+            this.hitThisAttack = false;
+            return;
+        }
+        // Heavy attack
         if (input.heavyPressed) {
             this.state = FighterState.HEAVY_ATTACK;
             this.stateFrame = 0;
             this.hitThisAttack = false;
             return;
         }
+        // Light attack
         if (input.lightPressed) {
             this.state = FighterState.LIGHT_ATTACK;
             this.stateFrame = 0;
@@ -374,18 +408,39 @@ export class Fighter {
     }
 
     _handleCrouchAttack(input, frameCount) {
-        if (input.lightPressed || input.heavyPressed) {
+        if (input.specialPressed) {
+            // Sweep: special while crouching
+            this.state = FighterState.SWEEP;
+            this.stateFrame = 0;
+            this.hitThisAttack = false;
+            return;
+        }
+        if (input.heavyPressed) {
+            this.state = FighterState.CROUCH_HEAVY;
+            this.stateFrame = 0;
+            this.hitThisAttack = false;
+            return;
+        }
+        if (input.lightPressed) {
             this.state = FighterState.CROUCH_LIGHT;
             this.stateFrame = 0;
             this.hitThisAttack = false;
+            return;
         }
     }
 
     _handleJumpAttack(input, frameCount) {
-        if ((input.lightPressed || input.heavyPressed) && this.state !== FighterState.JUMP_ATTACK) {
+        if (input.heavyPressed && this.state === FighterState.JUMP) {
+            this.state = FighterState.JUMP_HEAVY;
+            this.stateFrame = 0;
+            this.hitThisAttack = false;
+            return;
+        }
+        if (input.lightPressed && this.state === FighterState.JUMP) {
             this.state = FighterState.JUMP_ATTACK;
             this.stateFrame = 0;
             this.hitThisAttack = false;
+            return;
         }
     }
 
@@ -403,15 +458,21 @@ export class Fighter {
         if (input.lightPressed) this.bufferInput('light', frameCount);
         if (input.heavyPressed) this.bufferInput('heavy', frameCount);
         if (input.specialPressed) this.bufferInput('special', frameCount);
+        // Buffer directional attacks
+        if (input.heavyPressed && input.down) this.bufferInput('uppercut', frameCount);
+        if (input.specialPressed && input.down) this.bufferInput('sweep', frameCount);
 
         // Check for cancel on hit during active or early recovery
-        if (this.hitThisAttack && this.stateFrame >= move.startup + move.active - 2) {
+        if (this.hitThisAttack && this.stateFrame >= move.startup + move.active - 3) {
             const buffered = this.getBufferedAction(frameCount);
             if (buffered && this.canCancelInto(buffered)) {
                 const stateMap = {
                     light: FighterState.LIGHT_ATTACK,
                     heavy: FighterState.HEAVY_ATTACK,
                     special: FighterState.SPECIAL,
+                    uppercut: FighterState.UPPERCUT,
+                    overhead: FighterState.OVERHEAD,
+                    sweep: FighterState.SWEEP,
                 };
                 if (stateMap[buffered]) {
                     this.state = stateMap[buffered];
@@ -423,10 +484,39 @@ export class Fighter {
             }
         }
 
-        // Move forward during special attacks
+        // Move forward during rush attacks
         if (this.state === FighterState.SPECIAL && move.type === 'rush_punch') {
             if (this.stateFrame >= move.startup && this.stateFrame < move.startup + move.active) {
                 this.x += this.facing * 4;
+            }
+        }
+
+        // Teleport for teleport_strike
+        if (this.state === FighterState.SPECIAL && move.type === 'teleport_strike') {
+            if (this.stateFrame === move.startup) {
+                this.x += this.facing * 40;
+            }
+        }
+
+        // Uppercut launches the fighter upward
+        if (this.state === FighterState.UPPERCUT) {
+            if (this.stateFrame === move.startup && this.isGrounded) {
+                this.vy = this.def.jumpForce * 0.5;
+                this.isGrounded = false;
+            }
+        }
+
+        // Overhead forward motion
+        if (this.state === FighterState.OVERHEAD) {
+            if (this.stateFrame >= move.startup && this.stateFrame < move.startup + move.active) {
+                this.x += this.facing * 2;
+            }
+        }
+
+        // Sweep slides forward
+        if (this.state === FighterState.SWEEP) {
+            if (this.stateFrame >= move.startup && this.stateFrame < move.startup + move.active) {
+                this.x += this.facing * 2;
             }
         }
 
@@ -470,6 +560,7 @@ export class Fighter {
         let legSpread = 0;
         let crouching = false;
         let attackExtend = 0;
+        let kickExtend = 0;
 
         switch (s) {
             case FighterState.WALK_FWD:
@@ -478,23 +569,54 @@ export class Fighter {
                 break;
             case FighterState.CROUCH:
             case FighterState.BLOCK_CROUCH:
-            case FighterState.CROUCH_LIGHT:
                 crouching = true;
                 headY += 12;
                 bodyY += 10;
                 break;
+            case FighterState.CROUCH_LIGHT:
+                crouching = true;
+                headY += 12;
+                bodyY += 10;
+                attackExtend = this.stateFrame < 5 ? Math.min(this.stateFrame * 3, 10) : Math.max(0, 10 - (this.stateFrame - 5) * 3);
+                break;
+            case FighterState.CROUCH_HEAVY:
+                crouching = true;
+                headY += 12;
+                bodyY += 10;
+                attackExtend = this.stateFrame < 8 ? Math.min(this.stateFrame * 2, 14) : Math.max(0, 14 - (this.stateFrame - 8) * 2);
+                break;
             case FighterState.JUMP:
             case FighterState.JUMP_ATTACK:
+            case FighterState.JUMP_HEAVY:
                 legSpread = 3;
+                if (s === FighterState.JUMP_ATTACK) {
+                    attackExtend = this.stateFrame < 5 ? Math.min(this.stateFrame * 3, 10) : Math.max(0, 10 - (this.stateFrame - 5) * 2);
+                } else if (s === FighterState.JUMP_HEAVY) {
+                    kickExtend = this.stateFrame < 7 ? Math.min(this.stateFrame * 2, 12) : Math.max(0, 12 - (this.stateFrame - 7) * 2);
+                }
                 break;
             case FighterState.LIGHT_ATTACK:
-                attackExtend = this.stateFrame < 6 ? Math.min(this.stateFrame * 3, 12) : Math.max(0, 12 - (this.stateFrame - 6) * 3);
+                attackExtend = this.stateFrame < 5 ? Math.min(this.stateFrame * 3, 12) : Math.max(0, 12 - (this.stateFrame - 5) * 3);
                 break;
             case FighterState.HEAVY_ATTACK:
-                attackExtend = this.stateFrame < 10 ? Math.min(this.stateFrame * 2, 16) : Math.max(0, 16 - (this.stateFrame - 10) * 2);
+                attackExtend = this.stateFrame < 8 ? Math.min(this.stateFrame * 2, 16) : Math.max(0, 16 - (this.stateFrame - 8) * 2);
                 break;
             case FighterState.SPECIAL:
-                attackExtend = this.stateFrame < 12 ? Math.min(this.stateFrame * 2, 18) : Math.max(0, 18 - (this.stateFrame - 12) * 2);
+                attackExtend = this.stateFrame < 10 ? Math.min(this.stateFrame * 2, 18) : Math.max(0, 18 - (this.stateFrame - 10) * 2);
+                break;
+            case FighterState.UPPERCUT:
+                attackExtend = this.stateFrame < 6 ? Math.min(this.stateFrame * 3, 14) : Math.max(0, 14 - (this.stateFrame - 6) * 2);
+                armOffsetY = this.stateFrame < 6 ? -this.stateFrame * 2 : Math.max(0, -12 + (this.stateFrame - 6) * 2);
+                break;
+            case FighterState.OVERHEAD:
+                attackExtend = this.stateFrame < 12 ? Math.min(this.stateFrame * 1.5, 14) : Math.max(0, 14 - (this.stateFrame - 12) * 2);
+                armOffsetY = this.stateFrame < 10 ? -6 : 4;
+                break;
+            case FighterState.SWEEP:
+                crouching = true;
+                headY += 12;
+                bodyY += 10;
+                kickExtend = this.stateFrame < 7 ? Math.min(this.stateFrame * 2.5, 16) : Math.max(0, 16 - (this.stateFrame - 7) * 2);
                 break;
             case FighterState.HIT_STUN:
                 headY += 2;
@@ -524,50 +646,80 @@ export class Fighter {
             ctx.fillRect(x + legSpread, legY, 4, 14);
         }
 
+        // Kick rendering
+        if (kickExtend > 0) {
+            ctx.fillStyle = p.shoes;
+            const kickY = crouching ? y - 6 : legY + 6;
+            ctx.fillRect(x + f * 4, kickY, f * kickExtend, 5);
+            ctx.fillRect(x + f * (4 + kickExtend), kickY - 1, 5, 7);
+        }
+
         // Shoes
         ctx.fillStyle = p.shoes;
-        if (crouching) {
+        if (crouching && kickExtend <= 0) {
             ctx.fillRect(x - 6, y - 4, 12, 4);
-        } else {
+        } else if (kickExtend <= 0) {
             ctx.fillRect(x - 5 - legSpread, y - 4, 5, 4);
             ctx.fillRect(x + legSpread, y - 4, 5, 4);
         }
 
         // Body
         ctx.fillStyle = p.outfit;
-        const bY = crouching ? bodyY : bodyY;
-        ctx.fillRect(x - 6, bY, 12, 16);
+        ctx.fillRect(x - 6, bodyY, 12, 16);
 
         // Belt
         ctx.fillStyle = p.belt;
-        ctx.fillRect(x - 6, bY + 12, 12, 2);
+        ctx.fillRect(x - 6, bodyY + 12, 12, 2);
 
         // Accent stripe
         ctx.fillStyle = p.accent;
-        ctx.fillRect(x - 6, bY, 12, 2);
+        ctx.fillRect(x - 6, bodyY, 12, 2);
 
         // Arms
         ctx.fillStyle = p.skin;
         // Back arm
-        ctx.fillRect(x - 8 * f + armOffsetX, bY + 2 + armOffsetY, 4, 10);
+        ctx.fillRect(x - 8 * f + armOffsetX, bodyY + 2 + armOffsetY, 4, 10);
         // Front arm (attack arm)
         if (attackExtend > 0) {
             const armX = x + f * 6;
             const armEndX = armX + f * attackExtend;
             const minX = Math.min(armX, armEndX);
             const armW = Math.abs(attackExtend) + 4;
-            ctx.fillRect(minX, bY + 2, armW, 4);
+            ctx.fillRect(minX, bodyY + 2 + armOffsetY, armW, 4);
             // Fist
-            ctx.fillRect(x + f * (6 + attackExtend), bY + 1, 5, 6);
+            ctx.fillRect(x + f * (6 + attackExtend), bodyY + 1 + armOffsetY, 5, 6);
             // Special move glow
             if (s === FighterState.SPECIAL) {
                 ctx.fillStyle = p.accent;
                 ctx.globalAlpha = 0.6 + Math.sin(this.stateFrame * 0.5) * 0.3;
-                ctx.fillRect(x + f * (8 + attackExtend), bY - 1, 7, 8);
+                ctx.fillRect(x + f * (8 + attackExtend), bodyY - 1 + armOffsetY, 7, 8);
+                ctx.globalAlpha = 1;
+            }
+            // Uppercut glow
+            if (s === FighterState.UPPERCUT) {
+                ctx.fillStyle = '#FFCC00';
+                ctx.globalAlpha = 0.5 + Math.sin(this.stateFrame * 0.6) * 0.3;
+                ctx.fillRect(x + f * (6 + attackExtend) - 1, bodyY - 2 + armOffsetY, 7, 10);
+                ctx.globalAlpha = 1;
+            }
+            // Overhead glow
+            if (s === FighterState.OVERHEAD) {
+                ctx.fillStyle = '#FF4400';
+                ctx.globalAlpha = 0.4 + Math.sin(this.stateFrame * 0.4) * 0.2;
+                ctx.fillRect(x + f * (6 + attackExtend) - 1, bodyY - 1 + armOffsetY, 7, 8);
                 ctx.globalAlpha = 1;
             }
         } else {
-            ctx.fillRect(x + 5 * f + armOffsetX, bY + 2 + armOffsetY, 4, 10);
+            ctx.fillStyle = p.skin;
+            ctx.fillRect(x + 5 * f + armOffsetX, bodyY + 2 + armOffsetY, 4, 10);
+        }
+
+        // Sweep leg glow
+        if (s === FighterState.SWEEP && kickExtend > 0) {
+            ctx.fillStyle = '#FF8800';
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(x + f * (4 + kickExtend) - 2, y - 8, 8, 8);
+            ctx.globalAlpha = 1;
         }
 
         // Head
@@ -600,7 +752,6 @@ export class Fighter {
     }
 
     _drawKO(ctx, x, y, p) {
-        // Lying down
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.fillRect(x - 16, y - 4, 32, 3);
 

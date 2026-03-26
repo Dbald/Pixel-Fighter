@@ -1,3 +1,5 @@
+import { FighterState } from '../fighters/FighterState.js';
+
 export class CollisionSystem {
     static testAABB(a, b) {
         return a.x < b.x + b.width &&
@@ -16,10 +18,19 @@ export class CollisionSystem {
         return hitbox;
     }
 
-    static isBlocking(defender, attacker) {
+    static isBlocking(defender, attacker, hit) {
         const { state } = defender;
-        if (state === 'block_stand' || state === 'block_crouch') return true;
-        return false;
+        const isStandBlock = state === FighterState.BLOCK_STAND;
+        const isCrouchBlock = state === FighterState.BLOCK_CROUCH;
+
+        if (!isStandBlock && !isCrouchBlock) return false;
+
+        // Low attacks can't be blocked standing
+        if (hit && hit.low && isStandBlock) return false;
+        // Overhead attacks can't be blocked crouching
+        if (hit && hit.overhead && isCrouchBlock) return false;
+
+        return true;
     }
 
     static pushApart(f1, f2, minDist = 20) {

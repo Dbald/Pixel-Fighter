@@ -6,12 +6,27 @@ import { ArenaRenderer } from '../rendering/ArenaRenderer.js';
 import { HUD } from '../rendering/HUD.js';
 import { Effects } from '../rendering/Effects.js';
 import { ResultScene } from './ResultScene.js';
+import { PixelFont } from '../rendering/PixelFont.js';
+import { FIGHTERS, FIGHTER_LIST } from '../data/FighterDefs.js';
 
 const MatchPhase = {
     ROUND_INTRO: 'round_intro',
     FIGHTING: 'fighting',
     ROUND_END: 'round_end',
     MATCH_END: 'match_end',
+};
+
+const MOVE_LABELS = {
+    light: 'L',
+    heavy: 'H',
+    special: 'SP',
+    crouch_light: 'cL',
+    crouch_heavy: 'cH',
+    jump_attack: 'jL',
+    jump_heavy: 'jH',
+    uppercut: 'DP',
+    overhead: 'OH',
+    sweep: 'SW',
 };
 
 export class FightScene {
@@ -47,6 +62,9 @@ export class FightScene {
 
         this.introText = '';
         this.introTextTimer = 0;
+
+        // Pause / combo list
+        this.showComboList = false;
     }
 
     enter() {
@@ -75,8 +93,20 @@ export class FightScene {
         this.game.audio.playRoundBell();
     }
 
+    _emptyInput() {
+        return { left: false, right: false, up: false, down: false, light: false, heavy: false, special: false, lightPressed: false, heavyPressed: false, specialPressed: false };
+    }
+
     update() {
         this.frameCount++;
+
+        // Toggle combo list
+        if (this.game.input.wasPressed('Tab') || this.game.input.wasPressed('KeyC')) {
+            this.showComboList = !this.showComboList;
+        }
+
+        if (this.showComboList) return; // Pause when viewing combos
+
         this.phaseTimer++;
         this.effects.update();
 
@@ -109,8 +139,9 @@ export class FightScene {
             this.introText = '';
         }
 
-        this.p1.update({ left: false, right: false, up: false, down: false, light: false, heavy: false, special: false, lightPressed: false, heavyPressed: false, specialPressed: false }, this.p2, this.frameCount, this.arenaWidth);
-        this.p2.update({ left: false, right: false, up: false, down: false, light: false, heavy: false, special: false, lightPressed: false, heavyPressed: false, specialPressed: false }, this.p1, this.frameCount, this.arenaWidth);
+        const empty = this._emptyInput();
+        this.p1.update(empty, this.p2, this.frameCount, this.arenaWidth);
+        this.p2.update(empty, this.p1, this.frameCount, this.arenaWidth);
     }
 
     _updateFighting() {
@@ -165,7 +196,7 @@ export class FightScene {
 
     _resolveHit(attacker, defender, hit, isP1Attacking) {
         attacker.hitThisAttack = true;
-        const isBlocked = CollisionSystem.isBlocking(defender, attacker);
+        const isBlocked = CollisionSystem.isBlocking(defender, attacker, hit);
 
         if (isBlocked) {
             defender.takeDamage(hit.damage, hit.knockback, hit.blockstun, true);
@@ -190,7 +221,8 @@ export class FightScene {
                 attacker.lastMoveHit = hit.move;
             }
 
-            const hitType = hit.move === 'special' ? 'special' : (hit.move === 'heavy' ? 'heavy' : 'light');
+            const hitType = hit.move === 'special' ? 'special' :
+                           (hit.move === 'heavy' || hit.move === 'crouch_heavy' || hit.move === 'jump_heavy' || hit.move === 'uppercut' || hit.move === 'overhead') ? 'heavy' : 'light';
             this.game.audio.playHit(hitType);
             if (hitType === 'special') {
                 this.game.audio.playSpecial();
@@ -222,6 +254,20 @@ export class FightScene {
                 this.effects.shake(6, 12);
                 this.game.audio.playKO();
             }
+
+            // Knockdown from sweep
+            if (hit.knockdown && defender.state === FighterState.HIT_STUN) {
+                defender.state = FighterState.KNOCKDOWN;
+                defender.stateFrame = 0;
+                defender.vy = -3;
+                defender.isGrounded = false;
+            }
+
+            // Launcher pops opponent up
+            if (hit.launcher && defender.state === FighterState.HIT_STUN) {
+                defender.vy = -7;
+                defender.isGrounded = false;
+            }
         }
     }
 
@@ -229,9 +275,8 @@ export class FightScene {
         this.phase = MatchPhase.ROUND_END;
         this.phaseTimer = 0;
 
-        // Determine round winner
         if (this.p1.hp <= 0 && this.p2.hp <= 0) {
-            // Draw - no one gets a point, rare
+            // Draw
         } else if (this.p2.hp <= 0) {
             this.p1.roundsWon++;
             this.p1.state = FighterState.WIN;
@@ -245,7 +290,6 @@ export class FightScene {
                 this.p1.state = FighterState.KO;
             }
         } else {
-            // Timeout - whoever has more HP wins
             if (this.p1.hp >= this.p2.hp) {
                 this.p1.roundsWon++;
                 this.p1.state = FighterState.WIN;
@@ -259,12 +303,11 @@ export class FightScene {
     }
 
     _updateRoundEnd() {
-        // Let effects play out
-        this.p1.update({ left: false, right: false, up: false, down: false, light: false, heavy: false, special: false, lightPressed: false, heavyPressed: false, specialPressed: false }, this.p2, this.frameCount, this.arenaWidth);
-        this.p2.update({ left: false, right: false, up: false, down: false, light: false, heavy: false, special: false, lightPressed: false, heavyPressed: false, specialPressed: false }, this.p1, this.frameCount, this.arenaWidth);
+        const empty = this._emptyInput();
+        this.p1.update(empty, this.p2, this.frameCount, this.arenaWidth);
+        this.p2.update(empty, this.p1, this.frameCount, this.arenaWidth);
 
         if (this.phaseTimer >= 90) {
-            // Check if match is over
             if (this.p1.roundsWon >= 2 || this.p2.roundsWon >= 2) {
                 this.phase = MatchPhase.MATCH_END;
                 this.phaseTimer = 0;
@@ -322,14 +365,65 @@ export class FightScene {
         if (this.introText) {
             const alpha = this.introText === 'FIGHT!' ? 1 : Math.min(1, this.introTextTimer / 10);
             ctx.globalAlpha = alpha;
-            ctx.font = `bold ${this.introText === 'FIGHT!' ? 24 : 16}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#000';
-            ctx.fillText(this.introText, w / 2 + 2, h / 2 - 10 + 2);
-            ctx.fillStyle = this.introText === 'FIGHT!' ? '#FF4400' : '#FFFFFF';
-            ctx.fillText(this.introText, w / 2, h / 2 - 10);
+            const scale = this.introText === 'FIGHT!' ? 3 : 2;
+            PixelFont.draw(ctx, this.introText, w / 2, h / 2 - 12, {
+                color: this.introText === 'FIGHT!' ? '#FF4400' : '#FFFFFF',
+                scale,
+                shadow: true,
+                shadowColor: '#000',
+            });
             ctx.globalAlpha = 1;
         }
+
+        // Combo list hint
+        if (this.phase === MatchPhase.FIGHTING) {
+            PixelFont.draw(ctx, 'TAB: COMBOS', w / 2, h - 4, { color: '#555', scale: 1 });
+        }
+
+        // Combo list overlay
+        if (this.showComboList) {
+            this._renderComboList(ctx, w, h);
+        }
+    }
+
+    _renderComboList(ctx, w, h) {
+        // Darken background
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(0, 0, w, h);
+
+        PixelFont.draw(ctx, 'COMBO LIST', w / 2, 10, { color: '#FFCC00', scale: 2, shadow: true });
+
+        // P1 combos on left, P2 combos on right
+        const fighters = [this.p1Def, this.p2Def];
+        const labels = ['P1', 'P2'];
+        const xPositions = [w * 0.25, w * 0.75];
+
+        for (let fi = 0; fi < 2; fi++) {
+            const fighter = fighters[fi];
+            const cx = xPositions[fi];
+
+            PixelFont.draw(ctx, `${labels[fi]}: ${fighter.name}`, cx, 26, { color: '#FFF', scale: 1, shadow: true });
+
+            const routes = fighter.comboRoutes;
+            for (let i = 0; i < routes.length && i < 8; i++) {
+                const route = routes[i];
+                const ry = 38 + i * 14;
+
+                // Combo name
+                PixelFont.draw(ctx, route.name, cx, ry, { color: '#AAA', scale: 1, align: 'center' });
+
+                // Combo inputs
+                const inputStr = route.inputs.map(m => MOVE_LABELS[m] || m).join(' > ');
+                PixelFont.draw(ctx, inputStr, cx, ry + 7, { color: '#FFCC00', scale: 1, align: 'center' });
+            }
+        }
+
+        // Move legend at bottom
+        const legendY = h - 30;
+        PixelFont.draw(ctx, 'MOVE LEGEND', w / 2, legendY, { color: '#888', scale: 1 });
+        PixelFont.draw(ctx, 'L=LIGHT  H=HEAVY  SP=SPECIAL  DP=UPPERCUT', w / 2, legendY + 8, { color: '#666', scale: 1 });
+        PixelFont.draw(ctx, 'OH=OVERHEAD  SW=SWEEP  CL/CH=CROUCH  JL/JH=JUMP', w / 2, legendY + 16, { color: '#666', scale: 1 });
+
+        PixelFont.draw(ctx, 'PRESS TAB TO CLOSE', w / 2, h - 6, { color: '#555', scale: 1 });
     }
 }

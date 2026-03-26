@@ -1,3 +1,5 @@
+import { PixelFont } from './PixelFont.js';
+
 export class Effects {
     constructor() {
         this.particles = [];
@@ -9,8 +11,8 @@ export class Effects {
     }
 
     addHitSpark(x, y, type = 'light') {
-        const count = type === 'heavy' ? 8 : 5;
-        const speed = type === 'heavy' ? 4 : 2.5;
+        const count = type === 'heavy' ? 8 : type === 'special' ? 10 : 5;
+        const speed = type === 'heavy' ? 4 : type === 'special' ? 5 : 2.5;
         const colors = type === 'special'
             ? ['#00FFFF', '#FF00FF', '#FFFF00', '#FFFFFF']
             : ['#FFFF00', '#FF8800', '#FF4400', '#FFFFFF'];
@@ -51,7 +53,7 @@ export class Effects {
             life: 40,
             maxLife: 40,
             color: count >= 5 ? '#FF4400' : count >= 3 ? '#FFAA00' : '#FFFF00',
-            size: count >= 5 ? 10 : count >= 3 ? 9 : 8,
+            scale: count >= 5 ? 2 : 1,
         });
     }
 
@@ -63,7 +65,7 @@ export class Effects {
             life: 90,
             maxLife: 90,
             color: '#FF0000',
-            size: 20,
+            scale: 3,
         });
     }
 
@@ -76,7 +78,7 @@ export class Effects {
             life: 60,
             maxLife: 60,
             color: '#FFFFFF',
-            size: 16,
+            scale: 2,
         });
     }
 
@@ -142,20 +144,16 @@ export class Effects {
         }
         ctx.globalAlpha = 1;
 
-        // Draw texts
+        // Draw texts using PixelFont
         for (const t of this.texts) {
             const alpha = Math.min(1, t.life / 10);
-            const scale = t.life > t.maxLife - 5 ? 1 + (t.maxLife - t.life) * 0.1 : 1;
             ctx.globalAlpha = alpha;
-            ctx.font = `bold ${Math.round(t.size * scale)}px monospace`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            // Shadow
-            ctx.fillStyle = '#000';
-            ctx.fillText(t.text, Math.round(t.x) + 1, Math.round(t.y) + 1);
-            // Text
-            ctx.fillStyle = t.color;
-            ctx.fillText(t.text, Math.round(t.x), Math.round(t.y));
+            PixelFont.draw(ctx, t.text, Math.round(t.x), Math.round(t.y), {
+                color: t.color,
+                scale: t.scale || 1,
+                shadow: true,
+                shadowColor: '#000',
+            });
         }
         ctx.globalAlpha = 1;
 

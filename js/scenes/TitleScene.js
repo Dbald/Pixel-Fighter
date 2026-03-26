@@ -1,4 +1,6 @@
 import { CharSelectScene } from './CharSelectScene.js';
+import { HowToPlayScene } from './HowToPlayScene.js';
+import { PixelFont } from '../rendering/PixelFont.js';
 
 export class TitleScene {
     constructor(game) {
@@ -6,8 +8,9 @@ export class TitleScene {
         this.frame = 0;
         this.menuIndex = 0;
         this.menuItems = [
-            { label: 'VS CPU', mode: 'cpu' },
-            { label: '2 PLAYERS', mode: 'versus' },
+            { label: 'VS CPU', action: 'cpu' },
+            { label: '2 PLAYERS', action: 'versus' },
+            { label: 'HOW TO PLAY', action: 'howtoplay' },
         ];
     }
 
@@ -35,15 +38,18 @@ export class TitleScene {
         if (input.wasPressed('Enter') || input.wasPressed('Space') ||
             input.wasPressed('KeyF') || input.wasPressed('KeyG')) {
             this.game.audio.playMenuSelect();
-            const mode = this.menuItems[this.menuIndex].mode;
-            this.game.switchScene(new CharSelectScene(this.game, mode));
+            const action = this.menuItems[this.menuIndex].action;
+            if (action === 'howtoplay') {
+                this.game.switchScene(new HowToPlayScene(this.game));
+            } else {
+                this.game.switchScene(new CharSelectScene(this.game, action));
+            }
         }
     }
 
     render(ctx) {
         const w = this.game.WIDTH;
         const h = this.game.HEIGHT;
-        const r = this.game.renderer;
 
         // Background
         const grad = ctx.createLinearGradient(0, 0, 0, h);
@@ -61,22 +67,14 @@ export class TitleScene {
         }
 
         // Title
-        const titleY = 50 + Math.sin(this.frame * 0.03) * 3;
+        const titleY = 45 + Math.sin(this.frame * 0.03) * 3;
 
-        // Title shadow
-        ctx.font = 'bold 20px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = '#330066';
-        ctx.fillText('STREET PIXEL', w / 2 + 2, titleY + 2);
-        ctx.fillStyle = '#FF00FF';
-        ctx.fillText('STREET PIXEL', w / 2, titleY);
-
-        ctx.font = 'bold 24px monospace';
-        ctx.fillStyle = '#663300';
-        ctx.fillText('FIGHTER', w / 2 + 2, titleY + 24);
-        ctx.fillStyle = '#FFCC00';
-        ctx.fillText('FIGHTER', w / 2, titleY + 22);
+        PixelFont.draw(ctx, 'STREET PIXEL', w / 2, titleY, {
+            color: '#FF00FF', scale: 3, shadow: true, shadowColor: '#330066',
+        });
+        PixelFont.draw(ctx, 'FIGHTER', w / 2, titleY + 22, {
+            color: '#FFCC00', scale: 3, shadow: true, shadowColor: '#663300',
+        });
 
         // Decorative line
         ctx.fillStyle = '#FF00FF';
@@ -85,32 +83,34 @@ export class TitleScene {
         ctx.fillRect(w / 2 - 60, titleY + 40, 120, 1);
 
         // Menu items
-        const menuStartY = 130;
+        const menuStartY = 115;
         for (let i = 0; i < this.menuItems.length; i++) {
-            const my = menuStartY + i * 18;
+            const my = menuStartY + i * 16;
             const selected = i === this.menuIndex;
 
             if (selected) {
-                // Selection highlight
                 ctx.fillStyle = 'rgba(255,0,255,0.15)';
-                ctx.fillRect(w / 2 - 50, my - 7, 100, 14);
+                ctx.fillRect(w / 2 - 50, my - 5, 100, 12);
 
-                // Blinking arrow
                 if (this.frame % 30 < 20) {
-                    r.drawTextWithShadow('>', w / 2 - 42, my, '#FFCC00', '#000', 8);
+                    PixelFont.draw(ctx, '>', w / 2 - 42, my, { color: '#FFCC00', scale: 1, align: 'left' });
                 }
             }
 
-            const color = selected ? '#FFFFFF' : '#888888';
-            r.drawTextWithShadow(this.menuItems[i].label, w / 2, my, color, '#000', 8);
+            PixelFont.draw(ctx, this.menuItems[i].label, w / 2, my, {
+                color: selected ? '#FFFFFF' : '#666666',
+                scale: 1,
+                shadow: true,
+            });
         }
 
         // Footer
         if (this.frame % 60 < 45) {
-            r.drawText('PRESS ENTER TO START', w / 2, h - 30, '#888', 6);
+            PixelFont.draw(ctx, 'PRESS ENTER TO START', w / 2, h - 28, { color: '#888', scale: 1 });
         }
 
         // Controls hint
-        r.drawText('P1: WASD + F/G/H    P2: ARROWS + 7/8/9', w / 2, h - 14, '#555', 5);
+        PixelFont.draw(ctx, 'P1: WASD + F/G/H', w / 2, h - 16, { color: '#555', scale: 1 });
+        PixelFont.draw(ctx, 'P2: ARROWS + 7/8/9', w / 2, h - 8, { color: '#555', scale: 1 });
     }
 }

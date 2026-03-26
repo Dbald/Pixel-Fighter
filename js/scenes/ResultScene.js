@@ -1,6 +1,7 @@
 import { CharSelectScene } from './CharSelectScene.js';
 import { FightScene } from './FightScene.js';
 import { TitleScene } from './TitleScene.js';
+import { PixelFont } from '../rendering/PixelFont.js';
 
 export class ResultScene {
     constructor(game, winnerDef, winnerNum, p1Def, p2Def, arenaDef, mode, p1Rounds, p2Rounds) {
@@ -41,15 +42,15 @@ export class ResultScene {
             input.wasPressed('KeyF') || input.wasPressed('KeyG')) {
             this.game.audio.playMenuSelect();
             switch (this.menuIndex) {
-                case 0: // Rematch
+                case 0:
                     this.game.switchScene(new FightScene(
                         this.game, this.p1Def, this.p2Def, this.arenaDef, this.mode
                     ));
                     break;
-                case 1: // Character select
+                case 1:
                     this.game.switchScene(new CharSelectScene(this.game, this.mode));
                     break;
-                case 2: // Quit
+                case 2:
                     this.game.switchScene(new TitleScene(this.game));
                     break;
             }
@@ -59,7 +60,6 @@ export class ResultScene {
     render(ctx) {
         const w = this.game.WIDTH;
         const h = this.game.HEIGHT;
-        const r = this.game.renderer;
 
         // Background
         const grad = ctx.createLinearGradient(0, 0, 0, h);
@@ -75,17 +75,16 @@ export class ResultScene {
             ctx.strokeStyle = `rgba(255,204,0,${0.1 + Math.sin(this.frame * 0.03 + i) * 0.05})`;
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(w / 2, 60);
-            ctx.lineTo(w / 2 + Math.cos(angle) * len, 60 + Math.sin(angle) * len);
+            ctx.moveTo(w / 2, 55);
+            ctx.lineTo(w / 2 + Math.cos(angle) * len, 55 + Math.sin(angle) * len);
             ctx.stroke();
         }
 
         // Winner portrait
         const p = this.winnerDef.palette;
         const px = w / 2;
-        const py = 55;
+        const py = 50;
 
-        // Large character
         ctx.fillStyle = p.skin;
         ctx.fillRect(px - 6, py - 20, 12, 12);
         ctx.fillStyle = p.hair;
@@ -99,7 +98,6 @@ export class ResultScene {
         ctx.fillStyle = p.outfit;
         ctx.fillRect(px - 6, py + 8, 5, 12);
         ctx.fillRect(px + 1, py + 8, 5, 12);
-        // Victory arms up
         ctx.fillStyle = p.skin;
         ctx.fillRect(px - 12, py - 18, 5, 10);
         ctx.fillRect(px + 7, py - 18, 5, 10);
@@ -114,32 +112,31 @@ export class ResultScene {
             ? (isP1Win ? '#FFCC00' : '#FF4400')
             : '#FFCC00';
 
-        r.drawTextWithShadow(winLabel, w / 2, 95, winColor, '#000', 14);
-        r.drawTextWithShadow(this.winnerDef.name.toUpperCase(), w / 2, 112, '#FFF', '#000', 10);
+        PixelFont.draw(ctx, winLabel, w / 2, 88, { color: winColor, scale: 2, shadow: true });
+        PixelFont.draw(ctx, this.winnerDef.name, w / 2, 104, { color: '#FFF', scale: 2, shadow: true });
 
         // Score
-        r.drawText(`${this.p1Def.name} ${this.p1Rounds} - ${this.p2Rounds} ${this.p2Def.name}`, w / 2, 128, '#AAA', 6);
+        PixelFont.draw(ctx, `${this.p1Def.name} ${this.p1Rounds} - ${this.p2Rounds} ${this.p2Def.name}`, w / 2, 118, { color: '#AAA', scale: 1 });
 
         // Menu
-        const menuY = 148;
+        const menuY = 138;
         for (let i = 0; i < this.menuItems.length; i++) {
-            const my = menuY + i * 16;
+            const my = menuY + i * 14;
             const selected = i === this.menuIndex;
 
             if (selected) {
                 ctx.fillStyle = 'rgba(255,204,0,0.1)';
-                ctx.fillRect(w / 2 - 60, my - 6, 120, 12);
+                ctx.fillRect(w / 2 - 60, my - 4, 120, 10);
                 if (this.frame % 30 < 20) {
-                    r.drawText('>', w / 2 - 50, my, '#FFCC00', 7, 'left');
+                    PixelFont.draw(ctx, '>', w / 2 - 52, my, { color: '#FFCC00', scale: 1, align: 'left' });
                 }
             }
 
-            r.drawTextWithShadow(
-                this.menuItems[i],
-                w / 2, my,
-                selected ? '#FFF' : '#666',
-                '#000', 7
-            );
+            PixelFont.draw(ctx, this.menuItems[i], w / 2, my, {
+                color: selected ? '#FFF' : '#666',
+                scale: 1,
+                shadow: true,
+            });
         }
     }
 }

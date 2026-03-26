@@ -6,7 +6,6 @@ export class CPUController {
         this.decisionTimer = 0;
         this.currentDecision = null;
 
-        // Timing based on difficulty
         this.decisionInterval = difficulty === 1 ? 30 : difficulty === 2 ? 15 : 8;
         this.aggressiveness = difficulty === 1 ? 0.3 : difficulty === 2 ? 0.5 : 0.7;
         this.blockReaction = difficulty === 1 ? 0 : difficulty === 2 ? 0.3 : 0.7;
@@ -25,18 +24,14 @@ export class CPUController {
         if (cpu.state === FighterState.KO || cpu.state === FighterState.WIN) return input;
 
         const dist = Math.abs(cpu.x - opponent.x);
-        const facingOpponent = (opponent.x > cpu.x && cpu.facing === 1) ||
-                               (opponent.x < cpu.x && cpu.facing === -1);
 
         // React to opponent attacks with blocking
         if (ATTACK_STATES.includes(opponent.state) && dist < 50 && Math.random() < this.blockReaction) {
-            // Hold back to block
             if (opponent.x > cpu.x) {
                 input.left = true;
             } else {
                 input.right = true;
             }
-            // Sometimes crouch block
             if (Math.random() < 0.3) {
                 input.down = true;
             }
@@ -47,7 +42,6 @@ export class CPUController {
             return this._executeDecision(this.currentDecision, cpu, opponent, input);
         }
 
-        // Make new decision
         this.decisionTimer = this.decisionInterval + Math.floor(Math.random() * 10);
         this.currentDecision = this._decide(cpu, opponent, dist);
 
@@ -59,11 +53,13 @@ export class CPUController {
         if (dist < 40) {
             const roll = Math.random();
             if (roll < this.aggressiveness) {
-                // Attack
                 const atkRoll = Math.random();
-                if (atkRoll < 0.4) return 'light_attack';
-                if (atkRoll < 0.7) return 'heavy_attack';
-                if (atkRoll < 0.85) return 'special_attack';
+                if (atkRoll < 0.25) return 'light_attack';
+                if (atkRoll < 0.4) return 'heavy_attack';
+                if (atkRoll < 0.55) return 'special_attack';
+                if (atkRoll < 0.65) return 'uppercut';
+                if (atkRoll < 0.75) return 'overhead';
+                if (atkRoll < 0.85) return 'sweep';
                 return 'combo_attempt';
             }
             if (roll < this.aggressiveness + 0.2) return 'block';
@@ -102,9 +98,12 @@ export class CPUController {
             case 'jump_in':
                 input.up = true;
                 input[moveToward] = true;
-                // Sometimes air attack
                 if (Math.abs(cpu.x - opponent.x) < 50 && !cpu.isGrounded) {
-                    input.lightPressed = true;
+                    if (Math.random() < 0.5) {
+                        input.lightPressed = true;
+                    } else {
+                        input.heavyPressed = true;
+                    }
                 }
                 break;
 
@@ -126,10 +125,30 @@ export class CPUController {
                 }
                 break;
 
+            case 'uppercut':
+                if (!cpu.isLocked) {
+                    input.heavyPressed = true;
+                    input.down = true;
+                }
+                break;
+
+            case 'overhead':
+                if (!cpu.isLocked) {
+                    input.heavyPressed = true;
+                    input[moveToward] = true;
+                }
+                break;
+
+            case 'sweep':
+                if (!cpu.isLocked) {
+                    input.down = true;
+                    input.specialPressed = true;
+                }
+                break;
+
             case 'combo_attempt':
                 if (!cpu.isLocked) {
                     input.lightPressed = true;
-                    // Will buffer follow-ups
                     if (cpu.isAttacking && cpu.hitThisAttack && Math.random() < this.comboChance) {
                         const moves = ['lightPressed', 'heavyPressed', 'specialPressed'];
                         input[moves[Math.floor(Math.random() * moves.length)]] = true;
@@ -142,7 +161,6 @@ export class CPUController {
                 break;
 
             case 'wait':
-                // Do nothing
                 break;
         }
 

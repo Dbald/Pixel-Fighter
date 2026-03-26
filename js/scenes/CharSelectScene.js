@@ -2,6 +2,7 @@ import { FIGHTERS, FIGHTER_LIST } from '../data/FighterDefs.js';
 import { ARENAS, ARENA_LIST } from '../data/ArenaDefs.js';
 import { FightScene } from './FightScene.js';
 import { TitleScene } from './TitleScene.js';
+import { PixelFont } from '../rendering/PixelFont.js';
 
 export class CharSelectScene {
     constructor(game, mode) {
@@ -45,7 +46,7 @@ export class CharSelectScene {
                 this.p1Selection = (this.p1Selection + 1) % FIGHTER_LIST.length;
                 this.game.audio.playMenuMove();
             }
-            if (input.wasPressed('KeyF') || input.wasPressed('KeyG')) {
+            if (input.wasPressed('KeyF') || input.wasPressed('KeyG') || input.wasPressed('Enter') || input.wasPressed('Space')) {
                 this.p1Confirmed = true;
                 this.game.audio.playMenuSelect();
             }
@@ -68,7 +69,6 @@ export class CharSelectScene {
             }
         } else if (this.mode === 'cpu') {
             this.p2Confirmed = true;
-            // CPU picks a random different fighter
             if (this.p1Confirmed) {
                 if (this.p2Selection === this.p1Selection) {
                     this.p2Selection = (this.p1Selection + 1 + Math.floor(Math.random() * (FIGHTER_LIST.length - 1))) % FIGHTER_LIST.length;
@@ -115,7 +115,6 @@ export class CharSelectScene {
     render(ctx) {
         const w = this.game.WIDTH;
         const h = this.game.HEIGHT;
-        const r = this.game.renderer;
 
         // Background
         ctx.fillStyle = '#0a0a2e';
@@ -123,11 +122,11 @@ export class CharSelectScene {
 
         // Title bar
         ctx.fillStyle = '#1a0a3e';
-        ctx.fillRect(0, 0, w, 24);
-        r.drawTextWithShadow('SELECT YOUR FIGHTER', w / 2, 12, '#FFCC00', '#000', 10);
+        ctx.fillRect(0, 0, w, 18);
+        PixelFont.draw(ctx, 'SELECT YOUR FIGHTER', w / 2, 8, { color: '#FFCC00', scale: 2, shadow: true });
 
         if (this.selectingArena) {
-            this._renderArenaSelect(ctx, w, h, r);
+            this._renderArenaSelect(ctx, w, h);
             return;
         }
 
@@ -139,7 +138,7 @@ export class CharSelectScene {
         for (let i = 0; i < FIGHTER_LIST.length; i++) {
             const fighter = FIGHTERS[FIGHTER_LIST[i]];
             const cx = startX + i * (cardW + 8);
-            const cy = 40;
+            const cy = 28;
 
             const isP1 = i === this.p1Selection;
             const isP2 = i === this.p2Selection;
@@ -153,120 +152,111 @@ export class CharSelectScene {
                 ctx.strokeStyle = this.p1Confirmed ? '#00FF00' : '#3388FF';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(cx - 1, cy - 1, cardW + 2, cardH + 2);
-                r.drawText('P1', cx + 8, cy + 6, '#3388FF', 6);
+                PixelFont.draw(ctx, 'P1', cx + 10, cy + 5, { color: '#3388FF', scale: 1, align: 'left' });
             }
             if (isP2) {
                 ctx.strokeStyle = this.p2Confirmed ? '#00FF00' : '#FF4444';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(cx - 1, cy - 1, cardW + 2, cardH + 2);
-                r.drawText('P2', cx + cardW - 8, cy + 6, '#FF4444', 6);
+                PixelFont.draw(ctx, 'P2', cx + cardW - 10, cy + 5, { color: '#FF4444', scale: 1, align: 'right' });
             }
 
-            // Fighter preview (mini pixel art)
+            // Fighter preview
             this._drawFighterPreview(ctx, fighter, cx + cardW / 2, cy + 40);
 
             // Fighter name
-            r.drawText(fighter.name.toUpperCase(), cx + cardW / 2, cy + cardH - 20, '#FFF', 7);
+            PixelFont.draw(ctx, fighter.name, cx + cardW / 2, cy + cardH - 18, { color: '#FFF', scale: 1, shadow: true });
 
             // Archetype
-            ctx.fillStyle = fighter.palette.accent;
-            r.drawText(fighter.archetype.toUpperCase(), cx + cardW / 2, cy + cardH - 10, fighter.palette.accent, 5);
+            PixelFont.draw(ctx, fighter.archetype, cx + cardW / 2, cy + cardH - 8, { color: fighter.palette.accent, scale: 1 });
         }
 
         // Stats panel for P1 selection
         const selFighter = FIGHTERS[FIGHTER_LIST[this.p1Selection]];
-        this._drawStats(ctx, r, selFighter, 20, 145, w);
+        this._drawStats(ctx, selFighter, w, h);
 
         // Instructions
         if (!this.p1Confirmed) {
-            r.drawText('P1: A/D to select, F to confirm', w / 2, h - 20, '#888', 5);
+            PixelFont.draw(ctx, 'P1: A/D TO SELECT. F TO CONFIRM', w / 2, h - 18, { color: '#888', scale: 1 });
         } else if (this.mode === 'versus' && !this.p2Confirmed) {
-            r.drawText('P2: Arrows to select, 7 to confirm', w / 2, h - 20, '#888', 5);
+            PixelFont.draw(ctx, 'P2: ARROWS TO SELECT. 7 TO CONFIRM', w / 2, h - 18, { color: '#888', scale: 1 });
         }
-        r.drawText('ESC to go back', w / 2, h - 10, '#555', 5);
+        PixelFont.draw(ctx, 'ESC: BACK', w / 2, h - 8, { color: '#555', scale: 1 });
     }
 
     _drawFighterPreview(ctx, fighter, x, y) {
         const p = fighter.palette;
-        // Simple standing pose
-        // Head
         ctx.fillStyle = p.skin;
         ctx.fillRect(x - 3, y - 16, 6, 6);
-        // Hair
         ctx.fillStyle = p.hair;
         ctx.fillRect(x - 4, y - 18, 8, 3);
-        // Body
         ctx.fillStyle = p.outfit;
         ctx.fillRect(x - 4, y - 10, 8, 10);
-        // Accent
         ctx.fillStyle = p.accent;
         ctx.fillRect(x - 4, y - 10, 8, 2);
-        // Belt
         ctx.fillStyle = p.belt;
         ctx.fillRect(x - 4, y - 2, 8, 2);
-        // Legs
         ctx.fillStyle = p.outfit;
         ctx.fillRect(x - 3, y, 3, 8);
         ctx.fillRect(x + 1, y, 3, 8);
-        // Shoes
         ctx.fillStyle = p.shoes;
         ctx.fillRect(x - 3, y + 8, 3, 2);
         ctx.fillRect(x + 1, y + 8, 3, 2);
     }
 
-    _drawStats(ctx, r, fighter, x, y, width) {
-        const barW = 60;
+    _drawStats(ctx, fighter, w, h) {
+        const barW = 50;
         const stats = [
             { label: 'SPD', value: fighter.speed / 5, color: '#00CCFF' },
             { label: 'PWR', value: fighter.moves.heavy.damage / 200, color: '#FF4400' },
             { label: 'HP', value: fighter.hp / 1200, color: '#00CC44' },
         ];
 
-        r.drawTextWithShadow(fighter.name, width / 2, y, '#FFF', '#000', 8);
-        r.drawText(`"${fighter.subtitle}"`, width / 2, y + 12, '#AAA', 5);
+        const baseY = 132;
+        PixelFont.draw(ctx, fighter.name, w / 2, baseY, { color: '#FFF', scale: 1, shadow: true });
+        PixelFont.draw(ctx, `"${fighter.subtitle}"`, w / 2, baseY + 10, { color: '#AAA', scale: 1 });
 
-        const statsStartX = width / 2 - 50;
+        const statsStartX = w / 2 - 40;
         for (let i = 0; i < stats.length; i++) {
-            const sy = y + 22 + i * 10;
-            r.drawText(stats[i].label, statsStartX, sy, '#888', 5, 'left');
+            const sy = baseY + 20 + i * 10;
+            PixelFont.draw(ctx, stats[i].label, statsStartX, sy, { color: '#888', scale: 1, align: 'left' });
             ctx.fillStyle = '#333';
-            ctx.fillRect(statsStartX + 25, sy - 3, barW, 5);
+            ctx.fillRect(statsStartX + 25, sy - 2, barW, 5);
             ctx.fillStyle = stats[i].color;
-            ctx.fillRect(statsStartX + 25, sy - 3, Math.floor(barW * stats[i].value), 5);
+            ctx.fillRect(statsStartX + 25, sy - 2, Math.floor(barW * stats[i].value), 5);
         }
     }
 
-    _renderArenaSelect(ctx, w, h, r) {
-        r.drawTextWithShadow('SELECT ARENA', w / 2, 40, '#FFCC00', '#000', 10);
+    _renderArenaSelect(ctx, w, h) {
+        PixelFont.draw(ctx, 'SELECT ARENA', w / 2, 30, { color: '#FFCC00', scale: 2, shadow: true });
 
         const arena = ARENAS[ARENA_LIST[this.arenaSelection]];
 
         // Arena preview box
         ctx.fillStyle = arena.palette.sky;
-        ctx.fillRect(w / 2 - 80, 55, 160, 80);
+        ctx.fillRect(w / 2 - 80, 48, 160, 80);
         ctx.fillStyle = arena.palette.ground;
-        ctx.fillRect(w / 2 - 80, 110, 160, 25);
+        ctx.fillRect(w / 2 - 80, 103, 160, 25);
         ctx.fillStyle = arena.palette.groundLine;
-        ctx.fillRect(w / 2 - 80, 110, 160, 2);
-        // Accent details
+        ctx.fillRect(w / 2 - 80, 103, 160, 2);
         ctx.fillStyle = arena.palette.accent1;
-        ctx.fillRect(w / 2 - 40, 70, 20, 4);
+        ctx.fillRect(w / 2 - 40, 63, 20, 4);
         ctx.fillStyle = arena.palette.accent2;
-        ctx.fillRect(w / 2 + 20, 80, 20, 4);
+        ctx.fillRect(w / 2 + 20, 73, 20, 4);
 
         ctx.strokeStyle = '#FFCC00';
         ctx.lineWidth = 2;
-        ctx.strokeRect(w / 2 - 81, 54, 162, 82);
+        ctx.strokeRect(w / 2 - 81, 47, 162, 82);
 
-        r.drawTextWithShadow(arena.name.toUpperCase(), w / 2, 150, '#FFF', '#000', 8);
+        PixelFont.draw(ctx, arena.name, w / 2, 142, { color: '#FFF', scale: 1, shadow: true });
 
         // Arrows
         if (this.frame % 40 < 30) {
-            r.drawText('<', w / 2 - 100, 95, '#FFCC00', 12);
-            r.drawText('>', w / 2 + 100, 95, '#FFCC00', 12);
+            PixelFont.draw(ctx, '<', w / 2 - 100, 88, { color: '#FFCC00', scale: 2 });
+            PixelFont.draw(ctx, '>', w / 2 + 100, 88, { color: '#FFCC00', scale: 2 });
         }
 
-        r.drawText('PRESS ENTER OR F TO FIGHT', w / 2, h - 20, '#888', 5);
-        r.drawText('ESC to go back', w / 2, h - 10, '#555', 5);
+        PixelFont.draw(ctx, 'PRESS ENTER OR F TO FIGHT', w / 2, h - 18, { color: '#888', scale: 1 });
+        PixelFont.draw(ctx, 'ESC: BACK', w / 2, h - 8, { color: '#555', scale: 1 });
     }
 }
