@@ -98,9 +98,9 @@ export class HowToPlayScene {
             ['MOVE', 'ARROWS'],
             ['JUMP', 'UP'],
             ['CROUCH', 'DOWN'],
-            ['LIGHT ATTACK', '7'],
-            ['HEAVY ATTACK', '8'],
-            ['SPECIAL', '9'],
+            ['LIGHT ATTACK', 'J / 7'],
+            ['HEAVY ATTACK', 'K / 8'],
+            ['SPECIAL', 'L / 9'],
             ['BLOCK', 'HOLD BACK'],
         ];
         for (let i = 0; i < p2Controls.length; i++) {

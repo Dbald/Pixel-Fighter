@@ -19,12 +19,18 @@ export class InputManager {
             'ArrowRight': 'right',
             'ArrowUp': 'up',
             'ArrowDown': 'down',
+            // Numpad (right side, num lock on)
             'Numpad1': 'light',
             'Numpad2': 'heavy',
             'Numpad3': 'special',
+            // Number row fallback
             'Digit7': 'light',
             'Digit8': 'heavy',
             'Digit9': 'special',
+            // Right-hand letter keys (J/K/L) - easiest to reach
+            'KeyJ': 'light',
+            'KeyK': 'heavy',
+            'KeyL': 'special',
         };
 
         window.addEventListener('keydown', (e) => {

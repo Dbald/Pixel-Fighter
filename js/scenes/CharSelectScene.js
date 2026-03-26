@@ -63,7 +63,8 @@ export class CharSelectScene {
                 this.game.audio.playMenuMove();
             }
             if (input.wasPressed('Numpad1') || input.wasPressed('Numpad2') ||
-                input.wasPressed('Digit7') || input.wasPressed('Digit8')) {
+                input.wasPressed('Digit7') || input.wasPressed('Digit8') ||
+                input.wasPressed('KeyJ') || input.wasPressed('KeyK')) {
                 this.p2Confirmed = true;
                 this.game.audio.playMenuSelect();
             }
@@ -179,7 +180,7 @@ export class CharSelectScene {
         if (!this.p1Confirmed) {
             PixelFont.draw(ctx, 'P1: A/D TO SELECT. F TO CONFIRM', w / 2, h - 18, { color: '#888', scale: 1 });
         } else if (this.mode === 'versus' && !this.p2Confirmed) {
-            PixelFont.draw(ctx, 'P2: ARROWS TO SELECT. 7 TO CONFIRM', w / 2, h - 18, { color: '#888', scale: 1 });
+            PixelFont.draw(ctx, 'P2: ARROWS TO SELECT. J TO CONFIRM', w / 2, h - 18, { color: '#888', scale: 1 });
         }
         PixelFont.draw(ctx, 'ESC: BACK', w / 2, h - 8, { color: '#555', scale: 1 });
     }

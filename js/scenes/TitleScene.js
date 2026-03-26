@@ -111,6 +111,6 @@ export class TitleScene {
 
         // Controls hint
         PixelFont.draw(ctx, 'P1: WASD + F/G/H', w / 2, h - 16, { color: '#555', scale: 1 });
-        PixelFont.draw(ctx, 'P2: ARROWS + 7/8/9', w / 2, h - 8, { color: '#555', scale: 1 });
+        PixelFont.draw(ctx, 'P2: ARROWS + J/K/L', w / 2, h - 8, { color: '#555', scale: 1 });
     }
 }
