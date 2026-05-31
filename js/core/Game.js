@@ -27,14 +27,35 @@ export class Game {
 
         this._resizeCanvas();
         window.addEventListener('resize', () => this._resizeCanvas());
+        // Handle orientation change on mobile
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this._resizeCanvas(), 100);
+        });
     }
 
     _resizeCanvas() {
-        const scaleX = window.innerWidth / this.WIDTH;
-        const scaleY = window.innerHeight / this.HEIGHT;
-        const scale = Math.floor(Math.min(scaleX, scaleY)) || 1;
-        this.canvas.style.width = (this.WIDTH * scale) + 'px';
-        this.canvas.style.height = (this.HEIGHT * scale) + 'px';
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const scaleX = vw / this.WIDTH;
+        const scaleY = vh / this.HEIGHT;
+
+        // On touch devices, use the full viewport (fractional scaling is fine)
+        const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+        let scale;
+        if (isTouchDevice) {
+            // Fill as much of the screen as possible while maintaining aspect ratio
+            scale = Math.min(scaleX, scaleY);
+        } else {
+            // Desktop: use integer scaling for pixel-perfect rendering
+            scale = Math.max(1, Math.floor(Math.min(scaleX, scaleY)));
+        }
+
+        const w = Math.round(this.WIDTH * scale);
+        const h = Math.round(this.HEIGHT * scale);
+
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
     }
 
     switchScene(scene) {

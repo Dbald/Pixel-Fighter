@@ -2,12 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Street Pixel Fighter</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
+
+    <!-- Touch controls overlay (hidden on desktop) -->
+    <div id="touchControls">
+        <!-- D-Pad (left side) -->
+        <div id="dpad">
+            <button class="dpad-btn" data-dir="up" id="dpad-up"></button>
+            <button class="dpad-btn" data-dir="left" id="dpad-left"></button>
+            <button class="dpad-btn" data-dir="right" id="dpad-right"></button>
+            <button class="dpad-btn" data-dir="down" id="dpad-down"></button>
+            <div id="dpad-center"></div>
+        </div>
+
+        <!-- Action buttons (right side) -->
+        <div id="actionButtons">
+            <button class="action-btn" data-action="light" id="btn-light">L</button>
+            <button class="action-btn" data-action="heavy" id="btn-heavy">H</button>
+            <button class="action-btn" data-action="special" id="btn-special">SP</button>
+        </div>
+
+        <!-- Menu / utility buttons (top) -->
+        <div id="menuButtons">
+            <button class="menu-btn" data-action="start" id="btn-start">START</button>
+            <button class="menu-btn" data-action="tab" id="btn-tab">COMBOS</button>
+        </div>
+    </div>
+
     <script type="module" src="js/main.js"></script>
 </body>
 </html>
